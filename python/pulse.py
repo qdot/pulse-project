@@ -28,7 +28,7 @@ class LightstoneRecorder(threading.Thread):
         with closing(lightstone.open()) as l:
             while not self.stop.is_set():
                 l.get_data()
-                self.readings.append({"scl": l.scl, "hrv": l.hrv, "t": time.time()})
+                self.readings.append({"time": time.time(), "scl": l.scl, "hrv": l.hrv})
         print "Exiting Lightstone Thread"
 
 
@@ -43,7 +43,7 @@ class KeyRecorder(threading.Thread):
         while not self.stop.is_set():
             getch()
             if not self.stop.is_set():
-                self.readings.append({"key_time": time.time()})
+                self.readings.append({"time": time.time(), "key": 1})
         print "Exiting Key Thread"
 
 class PulseGame:
@@ -75,21 +75,22 @@ class PulseGame:
         
         print "Starting timer"
         # Run threads for 60 seconds
-        tm = threading.Timer(2, self.stopGame)
+        tm = threading.Timer(60, self.stopGame)
         tm.start()
         self.lt.start()
         self.kt.start()
-        time.sleep(3)
+        time.sleep(60)
 
         # Combine and sort information from objects
-        print self.lt.readings
-        print self.kt.readings
+        all_readings = self.lt.readings + self.kt.readings
 
         # Apply pulse peak algorithm
 
         # Apply scoring algorithm
 
         # Output to single json file
+        f = open("game_output.txt", "w+")
+        json.dump(all_readings, f)
 
         # Show graph
 
