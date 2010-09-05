@@ -14,41 +14,36 @@ def main():
 
     peak_dict = []
 
-    # print len(hrv_dict)
-    # current_peak = 0
-    # for (time, hrv) in hrv_dict:
-    #     #print "%s %s" % (time, hrv)
-    #     if hrv > current_peak:
-    #         peak_dict.append((time, hrv))
-    #         current_peak = hrv
-    #     else:
-    #         current_peak = current_peak * (1 - .0015)
-
-    current_peak = 0
     hrv_window = deque()
-    hrv_limit = 10
+    hrv_limit = 20
     hrv_total = []
-    for (time, hrv) in hrv_dict:
-        a = [time, hrv, 0]
+    stop_counter = 0
+    hrv_itr = hrv_dict.__iter__()
+    b = hrv_itr.next()
+
+    while 1:
+        a = [b[0], b[1], 0]
         hrv_window.append(a)
         hrv_total.append(a)
         if len(hrv_window) > hrv_limit:
             hrv_window.popleft()
-        max_hrv = 0
-        max_time = 0
-        for h in hrv_window:
-            if h[1] > max_hrv:
-                max_time = h[0]
-                max_hrv = h[1]
-        for h in hrv_window:
-            if h[0] == max_time:
-                h[2] = h[2] + 1
-                print h
+        m = max(hrv_window, key=lambda (x): x[1])
+        m[2] = m[2] + 1
+        # Move the iterator forward. If we're done iterating, just
+        # readd the last element onto the end.
+        try:
+            c = hrv_itr.next()
+            b = c
+        except StopIteration:
+            stop_counter = stop_counter + 1
+            if stop_counter == hrv_limit:
                 break
-
-    print hrv_total
-#    print peak_dict
-    print len(peak_dict)
+            
+    pulse = 0
+    for (time, hrv, score) in hrv_total:
+        if score > 17:
+            pulse += 1
+    print pulse
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -60,7 +60,7 @@ def main():
             #ax.plot(val["time"], val["hrv"], 'b,')
         elif "key" in val.keys():
             ax.plot(val["time"], 2.0, 'r,')
-    # ax.plot(t_hrv, hrv, 'b-')
+    ax.plot(t_hrv, hrv, 'b-')
 
     hrv_dict = []
     for el in l:
@@ -105,9 +105,9 @@ def main():
             
     pulse = 0
     for (time, hrv, score) in hrv_total:
-        if score > 15:
+        if score > 17:
             pulse = pulse + 1
-            ax.plot(time, 2, 'g,')
+            ax.plot(time, hrv, 'g,')
 
     print "Pulse: %s" % (pulse)
         
