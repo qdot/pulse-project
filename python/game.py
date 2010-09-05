@@ -2,6 +2,7 @@ import sys
 import time
 import itertools
 
+import math
 import Queue
 import threading
 import lightstone
@@ -325,15 +326,21 @@ class ScoreState(GameStateNode):
             readings.put(a)
 
         self.readings = []
+        self.score = 0
         while not readings.empty():
             self.readings.append(readings.get())
 
     def initialize(self):
         # self.font = pygame.font.SysFont("arial", 60)        
         # self.load_surface_to_texture(self.font.render("Your Score Is: %s" % 0, True, (255, 255, 255)))
+        glClearColor(0,0,0,0)
+        self.set_ortho_projection()
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         return
 
-    def calculateScore(self):
+    def calculate_peaks(self):
         hrv_dict = []
         for el in self.readings: 
             try:
@@ -341,30 +348,34 @@ class ScoreState(GameStateNode):
             except KeyError:
                 pass
 
-        current_peak = 0
         hrv_window = deque()
-        hrv_limit = 10
+        hrv_limit = 20
         hrv_total = []
-        for (time, hrv) in hrv_dict:
-            a = [time, hrv, 0]
+        stop_counter = 0
+        hrv_itr = hrv_dict.__iter__()
+        b = hrv_itr.next()
+        
+        while 1:
+            a = [b[0], b[1], 0]
             hrv_window.append(a)
             hrv_total.append(a)
             if len(hrv_window) > hrv_limit:
                 hrv_window.popleft()
-            max_hrv = 0
-            max_time = 0
-            for h in hrv_window:
-                if h[1] > max_hrv:
-                    max_time = h[0]
-                    max_hrv = h[1]
-            for h in hrv_window:
-                if h[0] == max_time:
-                    h[2] = h[2] + 1
+            m = max(hrv_window, key=lambda (x): x[1])
+            m[2] = m[2] + 1
+            # Move the iterator forward. If we're done iterating, just
+            # readd the last element onto the end.
+            try:
+                c = hrv_itr.next()
+                b = c
+            except StopIteration:
+                stop_counter = stop_counter + 1
+                if stop_counter == hrv_limit:
                     break
-
+            
         for (time, hrv, score) in hrv_total:
             if score > 15:
-                self.peaks.append((time, hrv))
+                self.peaks.append({"time" : time, "hrv" : hrv})
 
     def draw_graph(self):
         min_time = 0
@@ -380,10 +391,11 @@ class ScoreState(GameStateNode):
                 max_time = val["time"]
                 
         fig = plt.figure(1)
+
         fig.subplots_adjust(right=0.85)
         ax = SubplotZero(fig, 1, 1, 1)
         fig.add_subplot(ax)
-
+        plt.title("Score for Game: %s" % self.score)
         # make right and top axis invisible
         ax.axis["right"].set_visible(False)
         ax.axis["top"].set_visible(False)
@@ -403,14 +415,49 @@ class ScoreState(GameStateNode):
                 t_hrv.append(val["time"])
                 hrv.append(val["hrv"])
             else:
-                ax.plot(val["time"], 2.0, 'r,')
+                ax.plot(val["time"], 2.0, 'r.')
+
+        for peak in self.peaks:
+            ax.plot(peak["time"], peak["hrv"], 'g.', markersize=10)
         ax.plot(t_hrv, hrv, 'b-')
 
         plt.savefig('pulse_graph')
 
+    def calculate_score(self):
+        keys = []
+        peaks = {}
+        for val in self.readings:
+            if "key" in val:
+                closest = None
+                for p in self.peaks:
+                    if closest is None:
+                        closest = p
+                    elif math.fabs(p["time"] - val["time"]) < math.fabs(closest["time"] - val["time"]):
+                        closest = p
+                if closest["time"] in peaks.keys():
+                    peaks[closest["time"]].append(val)
+                else:
+                    peaks[closest["time"]] = [val]
+        score = 0
+        for (peak_time, presses) in peaks.items():
+            print "Peak time: %s" % peak_time
+            minimum = 1000
+            total_time = 0
+            for p in presses:
+                print " Press %s\n  Difference from Peak Time %s" % (p, math.fabs(p["time"] - peak_time))
+                total_time += math.fabs(p["time"] - peak_time)
+                if math.fabs(p["time"] - peak_time) < minimum:
+                    minimum = math.fabs(p["time"] - peak_time)
+                # remove the minimum from the total time, scale it (10%), and readd to minimum for score
+                total_time = ((total_time - minimum) * .1) + minimum
+                self.score += total_time
+            # find the keyhit with the minimum amount of time between the hit and the peak and add it to the score
+
     def runGameLoop(self):
-        self.calculateScore()
+        self.calculate_peaks()
+        self.calculate_score()
         self.draw_graph()
+
         self.load_texture("pulse_graph.png")
         while True:
             self.prepare_buffer()
